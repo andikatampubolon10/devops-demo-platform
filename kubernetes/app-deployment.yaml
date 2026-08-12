@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-app
+  namespace: devops-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: devops-app
+  template:
+    metadata:
+      labels:
+        app: devops-app
+    spec:
+      containers:
+        - name: devops-app
+          image: devops-demo-app:3.0
+          imagePullPolicy: IfNotPresent
+          command: ["node"]
+          args: ["server.js"]
+          ports:
+            - containerPort: 3000
+          env:
+            - name: RABBITMQ_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: devops-app-config
+                  key: RABBITMQ_URL

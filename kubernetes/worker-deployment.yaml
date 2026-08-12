@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-worker
+  namespace: devops-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: devops-worker
+  template:
+    metadata:
+      labels:
+        app: devops-worker
+    spec:
+      containers:
+        - name: worker
+          image: devops-worker:1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: RABBITMQ_URL
+              value: amqp://rabbitmq:5672

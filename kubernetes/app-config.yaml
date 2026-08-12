@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devops-app-config
+  namespace: devops-demo
+data:
+  RABBITMQ_URL: amqp://rabbitmq:5672
