@@ -10,6 +10,11 @@ pipeline {
         )
     }
 
+    environment {
+        KUBECONFIG = "${WORKSPACE}/.kube/config"
+        TF_VAR_kubeconfig_path = "${WORKSPACE}/.kube/config"
+    }
+
     stages {
 
         stage('Checkout') {
@@ -97,7 +102,10 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 dir('terraform') {
-                    withEnv(["KUBECONFIG=${env.WORKSPACE}/.kube/config"]) {
+                    withEnv([
+                        "KUBECONFIG=${env.WORKSPACE}/.kube/config",
+                        "TF_VAR_kubeconfig_path=${env.WORKSPACE}/.kube/config"
+                    ]) {
                         sh 'terraform init'
                     }
                 }
@@ -107,7 +115,10 @@ pipeline {
         stage('Terraform Validate') {
             steps {
                 dir('terraform') {
-                    withEnv(["KUBECONFIG=${env.WORKSPACE}/.kube/config"]) {
+                    withEnv([
+                        "KUBECONFIG=${env.WORKSPACE}/.kube/config",
+                        "TF_VAR_kubeconfig_path=${env.WORKSPACE}/.kube/config"
+                    ]) {
                         sh 'terraform validate'
                     }
                 }
@@ -117,7 +128,10 @@ pipeline {
         stage('Terraform Plan') {
             steps {
                 dir('terraform') {
-                    withEnv(["KUBECONFIG=${env.WORKSPACE}/.kube/config"]) {
+                    withEnv([
+                        "KUBECONFIG=${env.WORKSPACE}/.kube/config",
+                        "TF_VAR_kubeconfig_path=${env.WORKSPACE}/.kube/config"
+                    ]) {
                         sh 'terraform plan'
                     }
                 }
@@ -127,7 +141,10 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 dir('terraform') {
-                    withEnv(["KUBECONFIG=${env.WORKSPACE}/.kube/config"]) {
+                    withEnv([
+                        "KUBECONFIG=${env.WORKSPACE}/.kube/config",
+                        "TF_VAR_kubeconfig_path=${env.WORKSPACE}/.kube/config"
+                    ]) {
                         sh 'terraform apply -auto-approve'
                     }
                 }

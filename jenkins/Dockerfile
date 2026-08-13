@@ -35,4 +35,18 @@ RUN apt-get update && \
     apt-get install -y terraform && \
     rm -rf /var/lib/apt/lists/*
 
+# Install kubectl from official binary release.
+RUN KUBECTL_VERSION="v1.31.12" && \
+        ARCH="$(dpkg --print-architecture)" && \
+        case "$ARCH" in \
+            amd64) K8S_ARCH="amd64" ;; \
+            arm64) K8S_ARCH="arm64" ;; \
+            *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
+        esac && \
+        curl -fsSLo /tmp/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${K8S_ARCH}/kubectl" && \
+        curl -fsSLo /tmp/kubectl.sha256 "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${K8S_ARCH}/kubectl.sha256" && \
+        echo "$(cat /tmp/kubectl.sha256)  /tmp/kubectl" | sha256sum --check && \
+        install -m 0755 /tmp/kubectl /usr/local/bin/kubectl && \
+        rm -f /tmp/kubectl /tmp/kubectl.sha256
+
 USER jenkins
