@@ -50,13 +50,34 @@ pipeline {
 
         stage('Prepare Kubernetes Access') {
             steps {
-                withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
+                script {
+                    def kubeconfigReady = false
+
+                    try {
+                        withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
+                            sh '''
+                                set -e
+                                mkdir -p "$HOME/.kube"
+                                cp "$KUBECONFIG_FILE" "$HOME/.kube/config"
+                                chmod 600 "$HOME/.kube/config"
+                            '''
+                        }
+                        kubeconfigReady = true
+                        echo "Loaded kubeconfig from Jenkins credentials ID: ${params.KUBECONFIG_CREDENTIAL_ID}"
+                    } catch (err) {
+                        echo "Credential ID '${params.KUBECONFIG_CREDENTIAL_ID}' not found or inaccessible. Trying existing ~/.kube/config on Jenkins node."
+                    }
+
+                    if (!kubeconfigReady) {
+                        sh '''
+                            set -e
+                            test -f "$HOME/.kube/config"
+                            chmod 600 "$HOME/.kube/config"
+                        '''
+                    }
+
                     sh '''
                         set -e
-                        mkdir -p "$HOME/.kube"
-                        cp "$KUBECONFIG_FILE" "$HOME/.kube/config"
-                        chmod 600 "$HOME/.kube/config"
-
                         KUBECTL_BIN="$(command -v kubectl || true)"
                         if [ -z "$KUBECTL_BIN" ]; then
                           KUBECTL_BIN="$PWD/.tools/bin/kubectl"
@@ -72,15 +93,7 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 dir('terraform') {
-                    withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
-                        sh '''
-                            set -e
-                            mkdir -p "$HOME/.kube"
-                            cp "$KUBECONFIG_FILE" "$HOME/.kube/config"
-                            chmod 600 "$HOME/.kube/config"
-                            terraform init
-                        '''
-                    }
+                    sh 'terraform init'
                 }
             }
         }
@@ -88,15 +101,7 @@ pipeline {
         stage('Terraform Validate') {
             steps {
                 dir('terraform') {
-                    withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
-                        sh '''
-                            set -e
-                            mkdir -p "$HOME/.kube"
-                            cp "$KUBECONFIG_FILE" "$HOME/.kube/config"
-                            chmod 600 "$HOME/.kube/config"
-                            terraform validate
-                        '''
-                    }
+                    sh 'terraform validate'
                 }
             }
         }
@@ -104,15 +109,7 @@ pipeline {
         stage('Terraform Plan') {
             steps {
                 dir('terraform') {
-                    withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
-                        sh '''
-                            set -e
-                            mkdir -p "$HOME/.kube"
-                            cp "$KUBECONFIG_FILE" "$HOME/.kube/config"
-                            chmod 600 "$HOME/.kube/config"
-                            terraform plan
-                        '''
-                    }
+                    sh 'terraform plan'
                 }
             }
         }
@@ -120,15 +117,7 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 dir('terraform') {
-                    withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
-                        sh '''
-                            set -e
-                            mkdir -p "$HOME/.kube"
-                            cp "$KUBECONFIG_FILE" "$HOME/.kube/config"
-                            chmod 600 "$HOME/.kube/config"
-                            terraform apply -auto-approve
-                        '''
-                    }
+                    sh 'terraform apply -auto-approve'
                 }
             }
         }
