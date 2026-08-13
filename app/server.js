@@ -34,7 +34,7 @@ async function publishOrder(order) {
 
 app.get("/", (req, res) => {
     res.json({
-        message: "DevOps Demo Plsatform dsadais running!",
+        message: "DevOps Demo Plsatform dsadadsadais running!",
         status: "success"
     });
 });
