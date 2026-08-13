@@ -2,6 +2,14 @@ pipeline {
 
     agent any
 
+    parameters {
+        string(
+            name: 'KUBECONFIG_CREDENTIAL_ID',
+            defaultValue: 'kubeconfig-devops',
+            description: 'Jenkins Secret file credential ID for kubeconfig access'
+        )
+    }
+
     stages {
 
         stage('Checkout') {
@@ -42,7 +50,7 @@ pipeline {
 
         stage('Prepare Kubernetes Access') {
             steps {
-                withCredentials([file(credentialsId: 'kubeconfig-devops', variable: 'KUBECONFIG_FILE')]) {
+                withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
                     sh '''
                         set -e
                         mkdir -p "$HOME/.kube"
@@ -64,7 +72,7 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 dir('terraform') {
-                    withCredentials([file(credentialsId: 'kubeconfig-devops', variable: 'KUBECONFIG_FILE')]) {
+                    withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
                         sh '''
                             set -e
                             mkdir -p "$HOME/.kube"
@@ -80,7 +88,7 @@ pipeline {
         stage('Terraform Validate') {
             steps {
                 dir('terraform') {
-                    withCredentials([file(credentialsId: 'kubeconfig-devops', variable: 'KUBECONFIG_FILE')]) {
+                    withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
                         sh '''
                             set -e
                             mkdir -p "$HOME/.kube"
@@ -96,7 +104,7 @@ pipeline {
         stage('Terraform Plan') {
             steps {
                 dir('terraform') {
-                    withCredentials([file(credentialsId: 'kubeconfig-devops', variable: 'KUBECONFIG_FILE')]) {
+                    withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
                         sh '''
                             set -e
                             mkdir -p "$HOME/.kube"
@@ -112,7 +120,7 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 dir('terraform') {
-                    withCredentials([file(credentialsId: 'kubeconfig-devops', variable: 'KUBECONFIG_FILE')]) {
+                    withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
                         sh '''
                             set -e
                             mkdir -p "$HOME/.kube"
