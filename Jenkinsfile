@@ -52,15 +52,19 @@ pipeline {
             steps {
                 script {
                     def kubeconfigReady = false
+                    def kubeconfigTarget = "${env.WORKSPACE}/.kube/config"
+
+                    sh '''
+                        set -e
+                        mkdir -p "$WORKSPACE/.kube"
+                    '''
 
                     try {
                         withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
-                            sh '''
+                            sh """
                                 set -e
-                                mkdir -p "$HOME/.kube"
-                                cp "$KUBECONFIG_FILE" "$HOME/.kube/config"
-                                chmod 600 "$HOME/.kube/config"
-                            '''
+                                cp \"$KUBECONFIG_FILE\" \"${kubeconfigTarget}\"
+                            """
                         }
                         kubeconfigReady = true
                         echo "Loaded kubeconfig from Jenkins credentials ID: ${params.KUBECONFIG_CREDENTIAL_ID}"
@@ -69,15 +73,16 @@ pipeline {
                     }
 
                     if (!kubeconfigReady) {
-                        sh '''
+                        sh """
                             set -e
-                            test -f "$HOME/.kube/config"
-                            chmod 600 "$HOME/.kube/config"
-                        '''
+                            test -r "$HOME/.kube/config"
+                            cp "$HOME/.kube/config" "${kubeconfigTarget}"
+                        """
                     }
 
-                    sh '''
+                    sh """
                         set -e
+                        export KUBECONFIG=\"${kubeconfigTarget}\"
                         KUBECTL_BIN="$(command -v kubectl || true)"
                         if [ -z "$KUBECTL_BIN" ]; then
                           KUBECTL_BIN="$PWD/.tools/bin/kubectl"
@@ -85,7 +90,7 @@ pipeline {
 
                         "$KUBECTL_BIN" config current-context
                         "$KUBECTL_BIN" cluster-info
-                    '''
+                    """
                 }
             }
         }
@@ -93,7 +98,9 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 dir('terraform') {
-                    sh 'terraform init'
+                    withEnv(["KUBECONFIG=${env.WORKSPACE}/.kube/config"]) {
+                        sh 'terraform init'
+                    }
                 }
             }
         }
@@ -101,7 +108,9 @@ pipeline {
         stage('Terraform Validate') {
             steps {
                 dir('terraform') {
-                    sh 'terraform validate'
+                    withEnv(["KUBECONFIG=${env.WORKSPACE}/.kube/config"]) {
+                        sh 'terraform validate'
+                    }
                 }
             }
         }
@@ -109,7 +118,9 @@ pipeline {
         stage('Terraform Plan') {
             steps {
                 dir('terraform') {
-                    sh 'terraform plan'
+                    withEnv(["KUBECONFIG=${env.WORKSPACE}/.kube/config"]) {
+                        sh 'terraform plan'
+                    }
                 }
             }
         }
@@ -117,7 +128,9 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 dir('terraform') {
-                    sh 'terraform apply -auto-approve'
+                    withEnv(["KUBECONFIG=${env.WORKSPACE}/.kube/config"]) {
+                        sh 'terraform apply -auto-approve'
+                    }
                 }
             }
         }
