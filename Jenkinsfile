@@ -52,7 +52,6 @@ pipeline {
             steps {
                 script {
                     def kubeconfigReady = false
-                    def kubeconfigTarget = "${env.WORKSPACE}/.kube/config"
 
                     sh '''
                         set -e
@@ -61,10 +60,10 @@ pipeline {
 
                     try {
                         withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
-                            sh """
+                            sh '''
                                 set -e
-                                cp \"$KUBECONFIG_FILE\" \"${kubeconfigTarget}\"
-                            """
+                                cp "$KUBECONFIG_FILE" "$WORKSPACE/.kube/config"
+                            '''
                         }
                         kubeconfigReady = true
                         echo "Loaded kubeconfig from Jenkins credentials ID: ${params.KUBECONFIG_CREDENTIAL_ID}"
@@ -73,16 +72,16 @@ pipeline {
                     }
 
                     if (!kubeconfigReady) {
-                        sh """
+                        sh '''
                             set -e
                             test -r "$HOME/.kube/config"
-                            cp "$HOME/.kube/config" "${kubeconfigTarget}"
-                        """
+                            cp "$HOME/.kube/config" "$WORKSPACE/.kube/config"
+                        '''
                     }
 
-                    sh """
+                    sh '''
                         set -e
-                        export KUBECONFIG=\"${kubeconfigTarget}\"
+                        export KUBECONFIG="$WORKSPACE/.kube/config"
                         KUBECTL_BIN="$(command -v kubectl || true)"
                         if [ -z "$KUBECTL_BIN" ]; then
                           KUBECTL_BIN="$PWD/.tools/bin/kubectl"
@@ -90,7 +89,7 @@ pipeline {
 
                         "$KUBECTL_BIN" config current-context
                         "$KUBECTL_BIN" cluster-info
-                    """
+                    '''
                 }
             }
         }
