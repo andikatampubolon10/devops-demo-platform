@@ -125,14 +125,6 @@ pipeline {
             }
         }
 
-        stage('Unit Test App') {
-            steps {
-                dir('app') {
-                    sh 'docker run --rm -v "${PWD}:/app" -w /app node:22-bookworm-slim npm run test'
-                }
-            }
-        }
-
         stage('Build Docker Images') {
             steps {
                 script {
@@ -141,6 +133,12 @@ pipeline {
                     sh "docker build -t devops-worker:${env.IMAGE_TAG} ./worker"
                     // Catatan: Jika ada registry (Docker Hub/Harbor), tambahkan 'docker push' di sini
                 }
+            }
+        }
+
+        stage('Unit Test App') {
+            steps {
+                sh "docker run --rm devops-demo-app:${env.IMAGE_TAG} npm run test"
             }
         }
 

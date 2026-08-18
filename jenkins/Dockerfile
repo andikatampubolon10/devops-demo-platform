@@ -49,4 +49,5 @@ RUN KUBECTL_VERSION="v1.31.12" && \
         install -m 0755 /tmp/kubectl /usr/local/bin/kubectl && \
         rm -f /tmp/kubectl /tmp/kubectl.sha256
 
-USER jenkins
+# USER jenkins (dimatikan agar Jenkins punya akses root ke docker.sock)
+USER root
