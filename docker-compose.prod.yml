@@ -1,0 +1,15 @@
+services:
+  rabbitmq:
+    # Di Prod, kita tidak mengekspos port ke host untuk alasan keamanan.
+    # App dan Worker tetap bisa berkomunikasi di dalam network docker.
+    ports: []
+    restart: unless-stopped
+
+  app:
+    # Port aplikasi tetap diexpose agar bisa diakses load balancer/nginx
+    ports:
+      - "3000:3000"
+    restart: always
+
+  worker:
+    restart: always

@@ -1,0 +1,21 @@
+services:
+  rabbitmq:
+    # Di Dev, port management diexpose agar mudah diakses untuk debug
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    restart: "no"
+
+  app:
+    # Di Dev, kita pasang Volume agar kode lokal kita dibaca oleh container.
+    # Kita juga gunakan node --watch agar server otomatis restart jika file berubah.
+    volumes:
+      - ./app:/app
+      - /app/node_modules
+    command: npx nodemon -L server.js
+    ports:
+      - "3000:3000"
+    restart: "no"
+
+  worker:
+    restart: "no"

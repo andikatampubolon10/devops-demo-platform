@@ -13,13 +13,15 @@ provider "kubernetes" {
   config_path = var.kubeconfig_path
 }
 
-variable "kubeconfig_path" {
-  type = string
+
+locals {
+  environment  = terraform.workspace == "default" ? "dev" : terraform.workspace
+  app_replicas = local.environment == "prod" ? 3 : 1
 }
 
 resource "kubernetes_namespace" "devops" {
   metadata {
-    name = "devops-demo"
+    name = "devops-demo-${local.environment}"
   }
 }
 
@@ -30,7 +32,7 @@ resource "kubernetes_config_map" "app_config" {
   }
 
   data = {
-    RABBITMQ_URL = "amqp://rabbitmq:5672"
+    RABBITMQ_URL = "amqp://guest:guest@rabbitmq:5672"
   }
 }
 
@@ -45,7 +47,7 @@ resource "kubernetes_deployment" "app" {
   }
 
   spec {
-    replicas = 1
+    replicas = local.app_replicas
 
     selector {
       match_labels = {
@@ -63,7 +65,7 @@ resource "kubernetes_deployment" "app" {
       spec {
         container {
           name  = "devops-app"
-          image = "devops-demo-app:3.0"
+          image = "devops-demo-app:${var.app_image_tag}"
 
           port {
             container_port = 3000
@@ -187,7 +189,7 @@ resource "kubernetes_deployment" "worker" {
   }
 
   spec {
-    replicas = 1
+    replicas = local.app_replicas
 
     selector {
       match_labels = {
@@ -205,12 +207,12 @@ resource "kubernetes_deployment" "worker" {
       spec {
         container {
           name  = "worker"
-          image = "devops-worker:1.0"
+          image = "devops-worker:${var.worker_image_tag}"
 
           env {
             name  = "RABBITMQ_URL"
 
-            value = "amqp://rabbitmq:5672"
+            value = "amqp://guest:guest@rabbitmq:5672"
           }
         }
       }

@@ -1,10 +1,10 @@
 services:
   rabbitmq:
-    image: rabbitmq:3-management
     container_name: devops-rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -14,12 +14,13 @@ services:
     restart: unless-stopped
 
   app:
+    container_name: devops-app
+    image: devops-demo-app:latest
     build:
       context: ./app
       dockerfile: Dockerfile
-    container_name: devops-app
     environment:
-      RABBITMQ_URL: amqp://rabbitmq:5672
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     ports:
       - "3000:3000"
     depends_on:
@@ -28,12 +29,13 @@ services:
     restart: unless-stopped
 
   worker:
+    container_name: devops-worker
+    image: devops-worker:latest
     build:
       context: ./worker
       dockerfile: Dockerfile
-    container_name: devops-worker
     environment:
-      RABBITMQ_URL: amqp://rabbitmq:5672
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     depends_on:
       rabbitmq:
         condition: service_healthy

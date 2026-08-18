@@ -24,7 +24,7 @@ pipeline {
         }
 
         stage('Check Tools') {
-            steps {
+            steps { 
                 sh 'docker --version'
                 sh 'terraform version'
                 sh '''
@@ -125,25 +125,86 @@ pipeline {
             }
         }
 
-        stage('Terraform Plan') {
+        stage('Unit Test App') {
+            steps {
+                dir('app') {
+                    sh 'docker run --rm -v "${PWD}:/app" -w /app node:22-bookworm-slim npm run test'
+                }
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                script {
+                    env.IMAGE_TAG = "v${env.BUILD_NUMBER}"
+                    sh "docker build -t devops-demo-app:${env.IMAGE_TAG} ./app"
+                    sh "docker build -t devops-worker:${env.IMAGE_TAG} ./worker"
+                    // Catatan: Jika ada registry (Docker Hub/Harbor), tambahkan 'docker push' di sini
+                }
+            }
+        }
+
+        stage('Terraform Plan (Dev)') {
             steps {
                 dir('terraform') {
                     withEnv([
                         "KUBECONFIG=${env.WORKSPACE}/.kube/config",
-                        "TF_VAR_kubeconfig_path=${env.WORKSPACE}/.kube/config"
+                        "TF_VAR_kubeconfig_path=${env.WORKSPACE}/.kube/config",
+                        "TF_VAR_app_image_tag=${env.IMAGE_TAG}",
+                        "TF_VAR_worker_image_tag=${env.IMAGE_TAG}"
                     ]) {
+                        sh 'terraform workspace select dev || terraform workspace new dev'
                         sh 'terraform plan'
                     }
                 }
             }
         }
 
-        stage('Terraform Apply') {
+        stage('Terraform Apply (Dev)') {
             steps {
                 dir('terraform') {
                     withEnv([
                         "KUBECONFIG=${env.WORKSPACE}/.kube/config",
-                        "TF_VAR_kubeconfig_path=${env.WORKSPACE}/.kube/config"
+                        "TF_VAR_kubeconfig_path=${env.WORKSPACE}/.kube/config",
+                        "TF_VAR_app_image_tag=${env.IMAGE_TAG}",
+                        "TF_VAR_worker_image_tag=${env.IMAGE_TAG}"
+                    ]) {
+                        sh 'terraform apply -auto-approve'
+                    }
+                }
+            }
+        }
+
+        stage('Approval for Prod') {
+            steps {
+                input message: "Deploy to Production?", ok: "Yes, Deploy"
+            }
+        }
+
+        stage('Terraform Plan (Prod)') {
+            steps {
+                dir('terraform') {
+                    withEnv([
+                        "KUBECONFIG=${env.WORKSPACE}/.kube/config",
+                        "TF_VAR_kubeconfig_path=${env.WORKSPACE}/.kube/config",
+                        "TF_VAR_app_image_tag=${env.IMAGE_TAG}",
+                        "TF_VAR_worker_image_tag=${env.IMAGE_TAG}"
+                    ]) {
+                        sh 'terraform workspace select prod || terraform workspace new prod'
+                        sh 'terraform plan'
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Apply (Prod)') {
+            steps {
+                dir('terraform') {
+                    withEnv([
+                        "KUBECONFIG=${env.WORKSPACE}/.kube/config",
+                        "TF_VAR_kubeconfig_path=${env.WORKSPACE}/.kube/config",
+                        "TF_VAR_app_image_tag=${env.IMAGE_TAG}",
+                        "TF_VAR_worker_image_tag=${env.IMAGE_TAG}"
                     ]) {
                         sh 'terraform apply -auto-approve'
                     }
