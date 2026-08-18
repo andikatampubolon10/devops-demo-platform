@@ -34,7 +34,7 @@ async function publishOrder(order) {
 
 app.get("/", (req, res) => {
     res.json({
-        message: "DevOps is running HOT REdsaLOD FINAL!",
+        message: "DevOps is running HOT REdasdsaLOD FINAL!",
         status: "success"
     });
 });
