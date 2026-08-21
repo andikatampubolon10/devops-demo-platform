@@ -2,6 +2,11 @@ pipeline {
 
     agent any
 
+    options {
+        // Cegah concurrent build yang menyebabkan workspace @2 dengan state kosong
+        disableConcurrentBuilds()
+    }
+
     parameters {
         string(
             name: 'KUBECONFIG_CREDENTIAL_ID',
@@ -183,6 +188,19 @@ pipeline {
                         "TF_VAR_app_image_tag=${env.IMAGE_TAG}",
                         "TF_VAR_worker_image_tag=${env.IMAGE_TAG}"
                     ]) {
+                        // Auto-import resources yang sudah ada agar tidak error "already exists"
+                        sh '''
+                            NS="devops-demo-dev"
+                            terraform workspace select dev || terraform workspace new dev
+
+                            # Import namespace jika belum ada di state
+                            if kubectl get namespace "$NS" > /dev/null 2>&1; then
+                              if ! terraform state list | grep -q "kubernetes_namespace.devops"; then
+                                echo "Importing existing namespace $NS into Terraform state..."
+                                terraform import kubernetes_namespace.devops "$NS"
+                              fi
+                            fi
+                        '''
                         sh 'terraform apply -auto-approve'
                     }
                 }
