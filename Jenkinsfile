@@ -208,6 +208,9 @@ pipeline {
         }
 
         stage('Approval for Prod') {
+            // PENTING: agent none melepas executor Jenkins saat menunggu input manusia.
+            // Tanpa ini, executor ter-block dan klik tombol akan loading selamanya (deadlock).
+            agent none
             steps {
                 script {
                     // Tentukan versi yang akan naik ke prod
@@ -219,7 +222,7 @@ pipeline {
                     // Tampilkan info jelas sebelum approval
                     echo """\n
 ============================================================
-🚀  SIAP DEPLOY KE PRODUCTION
+SIAP DEPLOY KE PRODUCTION
 ------------------------------------------------------------
    Versi yang baru di-build  : ${env.IMAGE_TAG}
    Versi yang akan ke PROD   : ${env.PROD_TAG}
