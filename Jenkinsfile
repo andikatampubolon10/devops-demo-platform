@@ -223,6 +223,19 @@ pipeline {
                         echo "IMAGE_TAG dipulihkan dari file: ${env.IMAGE_TAG}"
                     }
 
+                    // Ambil daftar versi image dari Docker lokal
+                    // Format output hanya tag-nya saja, ambil yang berawalan 'v' (seperti v42, v41)
+                    def tagsStr = sh(script: "docker images --format '{{.Tag}}' devops-demo-app | grep '^v' || echo '${env.IMAGE_TAG}'", returnStdout: true).trim()
+                    
+                    // Buat list versi, dan pastikan versi yang baru di-build berada di urutan teratas
+                    def tagList = tagsStr.split('\n').collect { it.trim() }.findAll { it }.unique()
+                    if (tagList.contains(env.IMAGE_TAG)) {
+                        tagList.remove(env.IMAGE_TAG)
+                    }
+                    tagList.add(0, env.IMAGE_TAG) // Taruh versi terbaru di paling atas
+                    
+                    env.AVAILABLE_TAGS = tagList.join('\n') // Gabungkan dengan newline untuk choice parameter
+
                     // Jika PROD_IMAGE_TAG diisi → pakai itu (rollback)
                     // Jika kosong → pakai versi yang baru di-build
                     def prodTag = (params.PROD_IMAGE_TAG?.trim()) ? params.PROD_IMAGE_TAG.trim() : env.IMAGE_TAG
@@ -248,15 +261,15 @@ pipeline {
                         message: "Deploy ke Production?",
                         ok: "Ya, Deploy ke Prod",
                         parameters: [
-                            string(
+                            choice(
                                 name: 'SELECTED_PROD_TAG',
-                                defaultValue: env.PROD_TAG,
-                                description: 'Tentukan versi image yang akan di-deploy ke Production. Ubah jika ingin menggunakan versi lain (contoh: rollback).'
+                                choices: env.AVAILABLE_TAGS,
+                                description: 'Pilih versi image yang akan di-deploy ke Production dari daftar Docker Image lokal. Pilih versi lama jika ingin rollback.'
                             )
                         ]
                     )
                     
-                    // userInput akan berisi string value dari parameter SELECTED_PROD_TAG
+                    // userInput akan berisi string value dari parameter SELECTED_PROD_TAG yang dipilih
                     env.PROD_TAG = userInput.trim()
                 }
             }
