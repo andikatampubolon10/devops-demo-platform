@@ -11,11 +11,11 @@ services:
 
   app:
     # Di Dev, kita pasang Volume agar kode lokal kita dibaca oleh container.
-    # Kita juga gunakan node --watch agar server otomatis restart jika file berubah.
+    # Kita gunakan fitur native node --watch agar server otomatis restart jika file berubah.
     volumes:
       - ./app:/app
       - /app/node_modules
-    command: npx nodemon -L server.js
+    command: node --watch server.js
     ports:
       - "3000:3000"
     restart: "no"
