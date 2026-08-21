@@ -146,6 +146,10 @@ pipeline {
                     env.IMAGE_TAG = (params.IMAGE_VERSION?.trim()) ? params.IMAGE_VERSION.trim() : "v${env.BUILD_NUMBER}"
                     echo "Image tag yang digunakan: ${env.IMAGE_TAG}"
 
+                    // Simpan IMAGE_TAG ke file agar tidak hilang jika Jenkins restart
+                    // saat pipeline sedang menunggu approval di stage berikutnya
+                    writeFile file: '.build_tag', text: env.IMAGE_TAG
+
                     sh "docker build -t devops-demo-app:${env.IMAGE_TAG} ./app"
                     sh "docker tag devops-demo-app:${env.IMAGE_TAG} devops-demo-app:latest"
 
@@ -207,30 +211,42 @@ pipeline {
             }
         }
 
-        stage('Prod Deployment Notice') {
-            // Tidak ada approval manual — pipeline otomatis lanjut ke Production.
-            // Stage ini hanya menampilkan banner notifikasi di log sebelum deploy.
+        stage('Prepare Prod Tag') {
+            // Berjalan di agent (node) untuk membaca IMAGE_TAG dari file
+            // (aman dari Jenkins restart) dan menetapkan PROD_TAG sebelum
+            // masuk ke stage Approval yang menggunakan agent none.
             steps {
                 script {
-                    // Tentukan versi yang akan naik ke prod
-                    // Jika PROD_IMAGE_TAG diisi → pakai itu (bisa rollback ke versi lama)
-                    // Jika kosong → pakai versi yang baru di-build (env.IMAGE_TAG)
+                    // Jika IMAGE_TAG hilang karena Jenkins restart, baca dari file
+                    if (!env.IMAGE_TAG?.trim()) {
+                        env.IMAGE_TAG = readFile('.build_tag').trim()
+                        echo "IMAGE_TAG dipulihkan dari file: ${env.IMAGE_TAG}"
+                    }
+
+                    // Jika PROD_IMAGE_TAG diisi → pakai itu (rollback)
+                    // Jika kosong → pakai versi yang baru di-build
                     def prodTag = (params.PROD_IMAGE_TAG?.trim()) ? params.PROD_IMAGE_TAG.trim() : env.IMAGE_TAG
                     env.PROD_TAG = prodTag
 
-                    echo """\n
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-[ALERT] MEMULAI DEPLOY KE PRODUCTION
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   Versi yang baru di-build  : ${env.IMAGE_TAG}
-   Versi yang akan ke PROD   : ${env.PROD_TAG}
-   Status                    : AUTO-DEPLOY AKTIF
-------------------------------------------------------------
-Pipeline akan langsung melanjutkan ke Production.
-Pastikan Dev telah LULUS sebelum push ke branch main.
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-"""
+                    // Simpan juga PROD_TAG ke file agar aman dari restart
+                    writeFile file: '.prod_tag', text: env.PROD_TAG
+
+                    echo "PROD_TAG ditetapkan: ${env.PROD_TAG}"
                 }
+            }
+        }
+
+        stage('Approval for Prod') {
+            // agent none = executor dilepas saat menunggu input manusia.
+            // Ini mencegah executor deadlock (tombol loading selamanya).
+            // PROD_TAG sudah di-set dan di-persist di stage sebelumnya.
+            // Tidak ada submitter = semua user Jenkins bisa klik tombol.
+            agent none
+            steps {
+                input(
+                    message: "Deploy devops-demo-app:${env.PROD_TAG} ke Production?",
+                    ok: "Ya, Deploy ke Prod"
+                )
             }
         }
 
