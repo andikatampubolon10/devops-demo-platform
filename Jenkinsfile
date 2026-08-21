@@ -243,10 +243,22 @@ pipeline {
             // Tidak ada submitter = semua user Jenkins bisa klik tombol.
             agent none
             steps {
-                input(
-                    message: "Deploy devops-demo-app:${env.PROD_TAG} ke Production?",
-                    ok: "Ya, Deploy ke Prod"
-                )
+                script {
+                    def userInput = input(
+                        message: "Deploy ke Production?",
+                        ok: "Ya, Deploy ke Prod",
+                        parameters: [
+                            string(
+                                name: 'SELECTED_PROD_TAG',
+                                defaultValue: env.PROD_TAG,
+                                description: 'Tentukan versi image yang akan di-deploy ke Production. Ubah jika ingin menggunakan versi lain (contoh: rollback).'
+                            )
+                        ]
+                    )
+                    
+                    // userInput akan berisi string value dari parameter SELECTED_PROD_TAG
+                    env.PROD_TAG = userInput.trim()
+                }
             }
         }
 
