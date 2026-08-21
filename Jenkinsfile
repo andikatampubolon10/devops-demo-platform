@@ -8,6 +8,11 @@ pipeline {
             defaultValue: 'kubeconfig-devops',
             description: 'Jenkins Secret file credential ID for kubeconfig access'
         )
+        string(
+            name: 'PROD_APPROVERS',
+            defaultValue: 'admin',
+            description: 'Comma-separated Jenkins usernames allowed to approve production deploy'
+        )
     }
 
     environment {
@@ -175,7 +180,17 @@ pipeline {
 
         stage('Approval for Prod') {
             steps {
-                input message: "Deploy to Production?", ok: "Yes, Deploy"
+                script {
+                    timeout(time: 30, unit: 'MINUTES') {
+                        def approvedBy = input(
+                            message: 'Deploy to Production?',
+                            ok: 'Yes, Deploy',
+                            submitter: params.PROD_APPROVERS,
+                            submitterParameter: 'APPROVED_BY'
+                        )
+                        echo "Production deployment approved by: ${approvedBy}"
+                    }
+                }
             }
         }
 
