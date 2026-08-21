@@ -213,7 +213,8 @@ akan langsung dipromosikan ke Production.
 
                     input(
                         message: "Deploy devops-demo-app:${env.PROD_TAG} ke Production?",
-                        ok: "✅ Ya, Deploy ke Prod"
+                        ok: "Ya, Deploy ke Prod",
+                        submitter: "admin,andikatampubolon10"
                     )
                 }
             }
