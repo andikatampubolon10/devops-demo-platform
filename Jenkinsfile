@@ -207,10 +207,10 @@ pipeline {
             }
         }
 
-        stage('Approval for Prod') {
-            // PENTING: agent none melepas executor Jenkins saat menunggu input manusia.
-            // Tanpa ini, executor ter-block dan klik tombol akan loading selamanya (deadlock).
-            agent none
+        stage('Prepare Prod Tag') {
+            // Stage ini berjalan di agent (node) untuk meng-assign env.PROD_TAG
+            // sebelum masuk ke stage Approval yang menggunakan agent none.
+            // Ini penting agar env var tersedia dan tidak hilang saat Jenkins restart.
             steps {
                 script {
                     // Tentukan versi yang akan naik ke prod
@@ -231,13 +231,21 @@ Jika PROD_IMAGE_TAG dikosongkan, versi yang di-build sekarang
 akan langsung dipromosikan ke Production.
 ============================================================
 """
-
-                    input(
-                        message: "Deploy devops-demo-app:${env.PROD_TAG} ke Production?",
-                        ok: "Ya, Deploy ke Prod",
-                        submitter: "admin,andikatampubolon10"
-                    )
                 }
+            }
+        }
+
+        stage('Approval for Prod') {
+            // PENTING: agent none melepas executor Jenkins saat menunggu input manusia.
+            // Tanpa ini, executor ter-block dan klik tombol akan loading selamanya (deadlock).
+            // env.PROD_TAG sudah di-set di stage 'Prepare Prod Tag' sebelumnya.
+            agent none
+            steps {
+                input(
+                    message: "Deploy devops-demo-app:${env.PROD_TAG} ke Production?",
+                    ok: "Ya, Deploy ke Prod",
+                    submitter: "admin,andikatampubolon10"
+                )
             }
         }
 
