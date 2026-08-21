@@ -207,10 +207,9 @@ pipeline {
             }
         }
 
-        stage('Prepare Prod Tag') {
-            // Stage ini berjalan di agent (node) untuk meng-assign env.PROD_TAG
-            // sebelum masuk ke stage Approval yang menggunakan agent none.
-            // Ini penting agar env var tersedia dan tidak hilang saat Jenkins restart.
+        stage('Prod Deployment Notice') {
+            // Tidak ada approval manual — pipeline otomatis lanjut ke Production.
+            // Stage ini hanya menampilkan banner notifikasi di log sebelum deploy.
             steps {
                 script {
                     // Tentukan versi yang akan naik ke prod
@@ -219,33 +218,19 @@ pipeline {
                     def prodTag = (params.PROD_IMAGE_TAG?.trim()) ? params.PROD_IMAGE_TAG.trim() : env.IMAGE_TAG
                     env.PROD_TAG = prodTag
 
-                    // Tampilkan info jelas sebelum approval
                     echo """\n
-============================================================
-SIAP DEPLOY KE PRODUCTION
-------------------------------------------------------------
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+[ALERT] MEMULAI DEPLOY KE PRODUCTION
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    Versi yang baru di-build  : ${env.IMAGE_TAG}
    Versi yang akan ke PROD   : ${env.PROD_TAG}
+   Status                    : AUTO-DEPLOY AKTIF
 ------------------------------------------------------------
-Jika PROD_IMAGE_TAG dikosongkan, versi yang di-build sekarang
-akan langsung dipromosikan ke Production.
-============================================================
+Pipeline akan langsung melanjutkan ke Production.
+Pastikan Dev telah LULUS sebelum push ke branch main.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 """
                 }
-            }
-        }
-
-        stage('Approval for Prod') {
-            // PENTING: agent none melepas executor Jenkins saat menunggu input manusia.
-            // Tanpa ini, executor ter-block dan klik tombol akan loading selamanya (deadlock).
-            // env.PROD_TAG sudah di-set di stage 'Prepare Prod Tag' sebelumnya.
-            agent none
-            steps {
-                input(
-                    message: "Deploy devops-demo-app:${env.PROD_TAG} ke Production?",
-                    ok: "Ya, Deploy ke Prod",
-                    submitter: "admin,andikatampubolon10"
-                )
             }
         }
 
