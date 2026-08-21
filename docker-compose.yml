@@ -15,10 +15,7 @@ services:
 
   app:
     container_name: devops-app
-    image: devops-demo-app:latest
-    build:
-      context: ./app
-      dockerfile: Dockerfile
+    image: devops-demo-app:${IMAGE_TAG:-latest}
     environment:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     ports:
@@ -30,10 +27,7 @@ services:
 
   worker:
     container_name: devops-worker
-    image: devops-worker:latest
-    build:
-      context: ./worker
-      dockerfile: Dockerfile
+    image: devops-worker:${IMAGE_TAG:-latest}
     environment:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     depends_on:
