@@ -70,32 +70,61 @@ pipeline {
         stage('Prepare Kubernetes Access') {
             steps {
                 script {
-                    def kubeconfigReady = false
-
                     sh '''
                         set -e
                         mkdir -p "$WORKSPACE/.kube"
                     '''
 
-                    try {
-                        withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
-                            sh '''
-                                set -e
-                                cp "$KUBECONFIG_FILE" "$WORKSPACE/.kube/config"
-                            '''
-                        }
-                        kubeconfigReady = true
-                        echo "Loaded kubeconfig from Jenkins credentials ID: ${params.KUBECONFIG_CREDENTIAL_ID}"
-                    } catch (err) {
-                        echo "Credential ID '${params.KUBECONFIG_CREDENTIAL_ID}' not found or inaccessible. Trying existing ~/.kube/config on Jenkins node."
-                    }
+                    // Strategi: baca kubeconfig dari host filesystem melalui Docker socket
+                    // lalu patch server URL agar bisa diakses dari dalam container
+                    sh '''
+                        set -e
 
-                    if (!kubeconfigReady) {
-                        sh '''
-                            set -e
-                            test -r "$HOME/.kube/config"
-                            cp "$HOME/.kube/config" "$WORKSPACE/.kube/config"
-                        '''
+                        # Baca kubeconfig dari host Windows melalui volume /host-kube
+                        # (di-mount saat jenkins container dijalankan)
+                        HOST_KUBECONFIG="/host-kube/config"
+
+                        if [ -f "$HOST_KUBECONFIG" ]; then
+                            echo "Membaca kubeconfig dari host filesystem..."
+                            cp "$HOST_KUBECONFIG" "$WORKSPACE/.kube/config"
+
+                            # Patch: ganti 127.0.0.1 atau localhost dengan host.docker.internal
+                            sed -i "s|https://127.0.0.1:|https://host.docker.internal:|g" "$WORKSPACE/.kube/config"
+                            sed -i "s|https://localhost:|https://host.docker.internal:|g" "$WORKSPACE/.kube/config"
+
+                            # Tambahkan insecure-skip-tls-verify jika belum ada
+                            if ! grep -q "insecure-skip-tls-verify" "$WORKSPACE/.kube/config"; then
+                                sed -i "s|certificate-authority-data:.*|insecure-skip-tls-verify: true|g" "$WORKSPACE/.kube/config"
+                            fi
+
+                            echo "Kubeconfig siap (dari host):"
+                            grep "server:" "$WORKSPACE/.kube/config"
+                        else
+                            echo "Host kubeconfig tidak ditemukan di $HOST_KUBECONFIG"
+                            echo "Fallback: coba dari Jenkins credentials..."
+
+                            # Fallback ke credential Jenkins jika tersedia
+                            echo "KUBECONFIG_FALLBACK=true" > /tmp/kube_fallback
+                        fi
+                    '''
+
+                    // Fallback ke credential Jenkins jika host mount tidak tersedia
+                    if (fileExists('/tmp/kube_fallback')) {
+                        try {
+                            withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
+                                sh '''
+                                    set -e
+                                    cp "$KUBECONFIG_FILE" "$WORKSPACE/.kube/config"
+                                    sed -i "s|https://127.0.0.1:|https://host.docker.internal:|g" "$WORKSPACE/.kube/config"
+                                    sed -i "s|certificate-authority-data:.*|insecure-skip-tls-verify: true|g" "$WORKSPACE/.kube/config"
+                                '''
+                            }
+                            echo "Loaded kubeconfig from Jenkins credentials (fallback)"
+                        } catch (err) {
+                            error("Tidak bisa load kubeconfig dari host maupun credentials: ${err}")
+                        }
+                    } else {
+                        echo "Loaded kubeconfig from Jenkins credentials ID: ${params.KUBECONFIG_CREDENTIAL_ID}"
                     }
 
                     sh '''
