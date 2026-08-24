@@ -77,30 +77,24 @@ pipeline {
                         # ~/.kube dari host di-mount ke /host-kube di dalam container Jenkins
                         KUBE_SOURCE="/host-kube/config"
 
-                        if [ -f "$KUBE_SOURCE" ]; then
+                        if [ -f "$KUBE_SOURCE" ] && grep -q "server:" "$KUBE_SOURCE"; then
                             echo "Membaca kubeconfig dari $KUBE_SOURCE (host mount)"
 
                             # Ekstrak port aktif
                             LIVE_PORT=$(grep "server:" "$KUBE_SOURCE" | grep -oE "[0-9]{4,5}" | tail -1)
                             echo "Port Kubernetes yang aktif: $LIVE_PORT"
 
-                            # Ganti 127.0.0.1 dengan host.docker.internal
+                            # Buat kubeconfig baru dengan host.docker.internal dan skip TLS
                             sed "s|server: https://127.0.0.1:${LIVE_PORT}|server: https://host.docker.internal:${LIVE_PORT}|g" \
                                 "$KUBE_SOURCE" > "$WORKSPACE/.kube/config.tmp"
 
                             # Hapus certificate-authority-data, tambah insecure-skip-tls-verify
-                            python3 -c "
-import re
-with open('$WORKSPACE/.kube/config.tmp') as f:
-    content = f.read()
-content = re.sub(r'    certificate-authority-data: [^\n]+\n', '    insecure-skip-tls-verify: true\n', content)
-with open('$WORKSPACE/.kube/config', 'w') as f:
-    f.write(content)
-print('Kubeconfig berhasil dipatch: port=' + '$LIVE_PORT')
-"
-                            rm -f "$WORKSPACE/.kube/config.tmp"
+                            sed -i 's/^[[:space:]]*certificate-authority-data:.*/    insecure-skip-tls-verify: true/g' "$WORKSPACE/.kube/config.tmp"
+                            
+                            mv "$WORKSPACE/.kube/config.tmp" "$WORKSPACE/.kube/config"
+                            echo "Kubeconfig berhasil dipatch: port=$LIVE_PORT"
                         else
-                            echo "WARN: $KUBE_SOURCE tidak ditemukan, akan coba dari credential..."
+                            echo "WARN: $KUBE_SOURCE tidak valid atau kosong, akan coba dari credential..."
                         fi
                     '''
 
