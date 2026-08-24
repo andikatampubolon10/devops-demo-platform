@@ -127,7 +127,7 @@ print('Kubeconfig berhasil dipatch: port=' + '$LIVE_PORT')
                         fi
 
                         echo "=== Kubeconfig yang digunakan ==="
-                        grep "server:\|insecure" "$WORKSPACE/.kube/config" || true
+                        grep -E "server:|insecure" "$WORKSPACE/.kube/config" || true
                         echo "================================="
 
                         "$KUBECTL_BIN" config current-context
