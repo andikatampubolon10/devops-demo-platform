@@ -1,36 +1,95 @@
+# Production-shaped stack.
+name: devops-prod
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-rabbitmq-url: &rabbitmq-url amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@rabbitmq:5672
+
 services:
   rabbitmq:
-    container_name: devops-rabbitmq
     image: rabbitmq:3-management
+    container_name: devops-prod-rabbitmq
+    restart: unless-stopped
+    cpus: "1.0"
+    mem_limit: 1g
+    logging: *default-logging
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    # In production, RabbitMQ ports are not exposed to the host for security.
+    # App and Worker communicate internally within the Docker network.
+    volumes:
+      - devops-rabbitmq-data-prod:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s  
-    restart: unless-stopped
+      start_period: 15s
+    stop_grace_period: 30s
+    networks:
+      - devops-internal
 
   app:
-    container_name: devops-app
+    build:
+      context: ./app
+      dockerfile: Dockerfile
     image: devops-demo-app:${IMAGE_TAG:-latest}
+    container_name: devops-prod-app
+    restart: unless-stopped
+    init: true
+    cpus: "1.0"
+    mem_limit: 1g
+    logging: *default-logging
     environment:
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      NODE_ENV: production
+      PORT: ${APP_PORT:-3000}
+      RABBITMQ_URL: *rabbitmq-url
     ports:
-      - "3000:3000"
+      - "${APP_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:$${PORT:-3000}/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    stop_grace_period: 30s
     depends_on:
       rabbitmq:
         condition: service_healthy
-    restart: unless-stopped
+    networks:
+      - devops-internal
 
   worker:
-    container_name: devops-worker
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
     image: devops-worker:${IMAGE_TAG:-latest}
+    container_name: devops-prod-worker
+    restart: unless-stopped
+    init: true
+    cpus: "0.5"
+    mem_limit: 512m
+    logging: *default-logging
     environment:
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      NODE_ENV: production
+      RABBITMQ_URL: *rabbitmq-url
+    stop_grace_period: 30s
     depends_on:
       rabbitmq:
         condition: service_healthy
-    restart: unless-stopped
+    networks:
+      - devops-internal
+
+volumes:
+  devops-rabbitmq-data-prod:
+    name: devops-prod-rabbitmq-data
+
+networks:
+  devops-internal:
+    name: devops-prod-internal
+    driver: bridge

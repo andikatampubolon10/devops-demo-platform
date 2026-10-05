@@ -1,24 +1,102 @@
-include:
-  - docker-compose.yml
+# Development stack with hot reload.
+name: devops-dev
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-rabbitmq-url: &rabbitmq-url amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@rabbitmq:5672
 
 services:
   rabbitmq:
-    # Di Dev, port management diexpose agar mudah diakses untuk debug
+    image: rabbitmq:3-management
+    container_name: devops-dev-rabbitmq
+    restart: unless-stopped
+    cpus: "1.0"
+    mem_limit: 512m
+    logging: *default-logging
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
     ports:
-      - "5672:5672"
-      - "15672:15672"
-    restart: "no"
+      - "${DEV_RABBITMQ_PORT:-5672}:5672"
+      - "${DEV_RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - devops-rabbitmq-data-dev:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    stop_grace_period: 30s
+    networks:
+      - devops-internal
 
   app:
-    # Di Dev, kita pasang Volume agar kode lokal kita dibaca oleh container.
-    # Kita gunakan fitur native node --watch agar server otomatis restart jika file berubah.
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: devops-dev-app
+    restart: unless-stopped
+    init: true
+    cpus: "1.0"
+    mem_limit: 1g
+    logging: *default-logging
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      RABBITMQ_URL: *rabbitmq-url
     volumes:
       - ./app:/app
       - /app/node_modules
     command: node --watch server.js
     ports:
-      - "3000:3000"
-    restart: "no"
+      - "${DEV_APP_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    stop_grace_period: 30s
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - devops-internal
 
   worker:
-    restart: "no"
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: devops-dev-worker
+    restart: unless-stopped
+    init: true
+    cpus: "0.5"
+    mem_limit: 512m
+    logging: *default-logging
+    environment:
+      NODE_ENV: development
+      RABBITMQ_URL: *rabbitmq-url
+    volumes:
+      - ./worker:/app
+      - /app/node_modules
+    command: node --watch worker.js
+    stop_grace_period: 30s
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - devops-internal
+
+volumes:
+  devops-rabbitmq-data-dev:
+    name: devops-dev-rabbitmq-data
+
+networks:
+  devops-internal:
+    name: devops-dev-internal
+    driver: bridge
