@@ -34,7 +34,7 @@ async function publishOrder(order) {
 
 app.get("/", (req, res) => {
     res.json({
-        message: "DevOps is running HOT RELOAD 1234!",
+        message: "DevOps is running HOT RELOAD 12345!",
         status: "success"
     });
 });
